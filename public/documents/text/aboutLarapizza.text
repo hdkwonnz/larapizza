@@ -1,0 +1,76 @@
+*****larapizza(realtime pizza order tracker) 따라하기****
+    https://www.youtube.com/watch?v=pjK0VMTCtVg
+    위에 명시된 github으로 가서 완성된 코드를 다운로드한다.
+    composer create-project --prefer-dist laravel/laravel larapizza(<== 원하는 이름)
+        RuntimException error 나면 "composer clear-cache" enter
+    혹은
+     new laravel package download 하기(ubuntu ==> cd Code)
+    "laravel new larastart" type
+
+    npm install 하기
+     "yarn install --no-bin-links" type
+
+    database 와 table을 만든다.
+    php artisan make:model Order --migration
+    php artisan make:model Status --migration
+    app folder 안에 Order.php, Status.php 파일 수정
+    database/migrations 에서 해당 파일을 수정
+    migrate 하기 전에 주의 사항
+        users, password_resets, statuses table을 먼저 migrate 할 것
+        orders table에서 foreign key로 users, statuses table을 참조함으로 user_id, stauts_id 가 모두 bigInteger 로 통일해야한다.
+        왜냐하면 users table에서 id 가 bigInteger 이니까...
+        예==>$table->bigInteger('user_id')->unsigned();
+                 $table->foreign('user_id')->references('id')->on('users');
+    php artisan migrate
+    migration seed를 이용해서 Status table에 data 입력하기(방법을 몰라 매뉴럴로 입력 했음) maybe => php artisan make:migration --seed
+
+    .env  ==> add ==>BROADCAST_DRIVER=pusher
+    config/app.php ==>App\Providers\BroadcastServiceProvider::class, ==>uncomment
+
+        				   ],
+    laravel.com ===> broadcasting 참조할것
+    composer require pusher/pusher-php-server "~4.0"
+    https://pusher.com ==> login with google id==>create new app ==> get PUSHER_APP_ID, KEY,SECRET,CLUSTER
+    .env ==>add==>PUSHER_APP_ID=809082
+                              PUSHER_APP_KEY=9bc3a66de197236daa01
+                              PUSHER_APP_SECRET=ea13bd1e6dfa1103f3cf
+                              PUSHER_APP_CLUSTER=ap4
+    config/broadcasting.php ==> connections =>'options' => [
+                                                                                'cluster' => env('PUSHER_APP_CLUSTER'),
+                                                                                'encrypted' => true,
+                                                                                ],
+    Providers/EventServiceProvider.php ==> 'App\Events\OrderStatusChanged' => [ ==> 수정한후
+
+           					'App\Listeners\OrderStatusChangedListener',
+    php artisan event:generate ==> type
+    Event/OrderStatusChanged.php and Listeners\OrderStatusChangedListener 생긴다.
+    위에서 생긴 파일을 수정한다.
+    Event/OrderStatusChanged.php =>class OrderStatusChanged implements ShouldBroadcast
+                                                               public function broadcastOn() 수정 혹은 추가
+
+    route.php 에 해당 경로 추가.
+
+    npm install --save laravel-echo pusher-js==>error 나오니 아래 yarn으로 install 할 것...
+    yarn add laravel-echo pusher-js ==> --save는 사용하지 말 것...
+    package.json을 오픈 후 watch 칸에 "--watch-poll" 을 추가한다(아래 참조)
+    "watch": "cross-env NODE_ENV=development node_modules/webpack/bin/webpack.js --watch --watch-poll --progress --hide-modules --config=node_modules/laravel-mix/setup/webpack.config.js",
+    npm run watch
+    resources/js/bootstrap.js==>맨 하단에있는 코드 uncomment => import Echo from 'laravel-echo'........
+
+    resources/js/app.js => const app = new Vue({.....  추가...
+
+    - progress bar install
+       https://wffranco.github.io/vue-strap
+       yarn add github:wffranco/vue-strap --save
+
+   - vue-timeago install
+      https://github.com/egoist/vue-timeago
+      yarn add vue-timeago
+
+    routes/channels.php ==> add channel name
+
+  ******************pusher 작동의 큰 그림*********************
+  1. controller의 어딘가에서(AdminOrdersController/function update)에서 fire(enven의 시작 ==> event(new OrderStatusChanged($order))한다.
+  2. 위 1에서 값을 전달 받아 (Events/OrderStatusChanged.php) data를 가공 후 channel을 통하여(pizza-tracker + $this->order->id 혹은 pizza-tracker)
+      해당 UI(show.blade.php/OderProgress.vue ==> Echo.private('pizza-tracker.' + this.order_id)......)로 전달 한다.
+  3. 해당 UI는 datat를 가공하여 user에게 보여 준다.
